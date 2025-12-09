@@ -1,0 +1,205 @@
+<div class="dashboard-container">
+  <header class="dashboard-header">
+    <div class="header-content">
+      <h1>Dashboard</h1>
+      <div class="user-info">
+        <button *ngIf="isAdmin()" class="admin-menu-button" (click)="toggleUserManagement()" [class.active]="showUserManagement">
+          <span class="admin-icon">⚙️</span>
+          {{ showUserManagement ? 'Hide User Management' : 'Manage Users & Roles' }}
+        </button>
+        <span class="user-email">{{ currentUser?.email }}</span>
+        <span class="user-role" [class.admin]="isAdmin()">{{ currentUser?.role | uppercase }}</span>
+        <button class="logout-button" (click)="logout()">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="dashboard-main">
+    <div class="welcome-card">
+      <h2>Welcome, {{ currentUser?.email }}!</h2>
+      <p>You are logged in as <strong>{{ currentUser?.role }}</strong></p>
+    </div>
+
+    <div class="content-grid">
+      <div class="card">
+        <h3>Profile Information</h3>
+        <div class="info-item">
+          <span class="label">Email:</span>
+          <span class="value">{{ currentUser?.email }}</span>
+        </div>
+        <div class="info-item">
+          <span class="label">Role:</span>
+          <span class="value">{{ currentUser?.role }}</span>
+        </div>
+        <div class="info-item">
+          <span class="label">User ID:</span>
+          <span class="value">{{ currentUser?.id }}</span>
+        </div>
+      </div>
+
+      <div class="card" *ngIf="isAdmin()">
+        <div class="admin-card-header">
+          <h3>Admin Panel</h3>
+          <button class="admin-button" (click)="toggleUserManagement()">
+            {{ showUserManagement ? 'Hide User Management' : 'Manage Users' }}
+          </button>
+        </div>
+        <p>You have administrator privileges. Use the option above to add, edit, or delete users and update their roles.</p>
+        <ul class="admin-hints">
+          <li>Create new accounts for teammates</li>
+          <li>Elevate or demote roles as needed</li>
+          <li>Clean up unused users safely</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>Quick Actions</h3>
+        <div class="action-buttons">
+          <button class="action-button">View Reports</button>
+          <button class="action-button">Settings</button>
+          <button class="action-button">Help</button>
+        </div>
+      </div>
+
+      <div class="card admin-card" *ngIf="isAdmin() && showUserManagement" #userManagementSection>
+        <div class="admin-card-header">
+          <h3>User Management</h3>
+          <span class="status-text" [class.loading]="isLoadingUsers">
+            {{ isLoadingUsers ? 'Loading users...' : users.length + ' users' }}
+          </span>
+        </div>
+
+        <div class="alert success" *ngIf="userMessage">{{ userMessage }}</div>
+        <div class="alert error" *ngIf="userError">{{ userError }}</div>
+
+        <form class="user-form" (ngSubmit)="createUser()" autocomplete="off">
+          <h4>Add New User</h4>
+          <div class="form-grid">
+            <label class="form-field">
+              <span>Email</span>
+              <input
+                type="email"
+                name="newUserEmail"
+                required
+                [(ngModel)]="newUser.email"
+                placeholder="user@example.com"
+              />
+            </label>
+            <label class="form-field">
+              <span>Password</span>
+              <input
+                type="password"
+                name="newUserPassword"
+                required
+                minlength="6"
+                [(ngModel)]="newUser.password"
+                placeholder="Minimum 6 characters"
+              />
+            </label>
+            <label class="form-field">
+              <span>Role</span>
+              <select
+                name="newUserRole"
+                [(ngModel)]="newUser.role"
+                required
+              >
+                <option value="user">User</option>
+                <option value="admin">Admin</option>
+              </select>
+            </label>
+            <div class="form-actions">
+              <button class="admin-button" type="submit" [disabled]="isSavingUser">
+                {{ isSavingUser ? 'Saving...' : 'Add User' }}
+              </button>
+            </div>
+          </div>
+        </form>
+
+        <div class="table-wrapper">
+          <div class="table-header">
+            <h4>Existing Users</h4>
+            <button class="text-button" type="button" (click)="loadUsers()" [disabled]="isLoadingUsers">
+              Refresh
+            </button>
+          </div>
+          <div class="empty" *ngIf="!isLoadingUsers && users.length === 0">
+            No users found. Add your first user above.
+          </div>
+          <table *ngIf="users.length > 0">
+            <thead>
+              <tr>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Created</th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let user of users; trackBy: trackByUserId">
+                <td>
+                  <ng-container *ngIf="editUserId === user.id; else viewEmail">
+                    <input
+                      type="email"
+                      [ngModelOptions]="{ standalone: true }"
+                      [(ngModel)]="editForm.email"
+                    />
+                  </ng-container>
+                  <ng-template #viewEmail>
+                    {{ user.email }}
+                  </ng-template>
+                </td>
+                <td>
+                  <ng-container *ngIf="editUserId === user.id; else viewRole">
+                    <select
+                      [ngModelOptions]="{ standalone: true }"
+                      [(ngModel)]="editForm.role"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </ng-container>
+                  <ng-template #viewRole>
+                    <span class="badge" [class.badge-admin]="user.role === 'admin'">{{ user.role }}</span>
+                  </ng-template>
+                </td>
+                <td>
+                  <ng-container *ngIf="editUserId === user.id; else createdDate">
+                    <input
+                      type="password"
+                      placeholder="New password (optional)"
+                      [ngModelOptions]="{ standalone: true }"
+                      [(ngModel)]="editForm.password"
+                    />
+                  </ng-container>
+                  <ng-template #createdDate>
+                    {{ user.created_at || '—' }}
+                  </ng-template>
+                </td>
+                <td class="actions-col">
+                  <ng-container *ngIf="editUserId === user.id; else rowActions">
+                    <button class="text-button" type="button" (click)="saveEdit()" [disabled]="isSavingUser">
+                      Save
+                    </button>
+                    <button class="text-button" type="button" (click)="cancelEdit()" [disabled]="isSavingUser">
+                      Cancel
+                    </button>
+                  </ng-container>
+                  <ng-template #rowActions>
+                    <button class="text-button" type="button" (click)="startEdit(user)">
+                      Edit
+                    </button>
+                    <button class="text-button danger" type="button" (click)="deleteUser(user.id)" [disabled]="isSavingUser">
+                      Delete
+                    </button>
+                  </ng-template>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+
